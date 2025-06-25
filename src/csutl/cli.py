@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 debug = False
 
 def process_get(args):
+    """
+    Handle get type requests for the public api
+    """
+
+    # Process incoming arguments
     val_arg(isinstance(args.url, str), "Invalid type for URL")
     val_arg(args.url != "", "Empty URL provided")
 
@@ -22,12 +27,14 @@ def process_get(args):
     response = api.get(args.url)
 
     # Display output from the API, formatting if required
-    if args.raw_output:
-        print(response)
-    else:
-        print(json.dumps(json.loads(response), indent=4))
+    print_output(args, response)
 
 def process_post(args):
+    """
+    Process post type requests for the private and read-only api
+    """
+
+    # Process incoming arguments
     val_arg(isinstance(args.url, str), "Invalid type for URL")
     val_arg(args.url != "", "Empty URL provided")
 
@@ -41,10 +48,59 @@ def process_post(args):
     response = api.post(args.url, payload, raw_payload=args.raw_input)
 
     # Display output from the API, formatting if required
+    print_output(args, response)
+
+def process_balance(args):
+    """
+    Process request to display balances for the account
+    """
+
+    # Api for coinspot access
+    api = CoinSpotApi()
+
+    url = "/api/v2/ro/my/balances"
+
+    if args.cointype is not None:
+        val_arg(isinstance(args.cointype, str), "Invalid cointype supplied")
+        val_arg(args.cointype != "", "Empty coin type provided")
+
+        url = f"/api/v2/ro/my/balance/{args.cointype}?available=yes"
+
+    # Request balance info
+    response = api.post(url, "{}")
+
+    print_output(args, response)
+
+def add_common_args(parser):
+    """
+    Common arguments for all subcommands
+    """
+
+    # Process incoming arguments
+    val_arg(isinstance(parser, argparse.ArgumentParser), "Invalid parser supplied to add_common_args")
+
+    # Debug option
+    parser.add_argument(
+        "-d", action="store_true", dest="debug", help="Enable debug output"
+    )
+
+    # Json formatting options
+    parser.add_argument("--raw-output", action="store_true", dest="raw_output", help="Raw (unpretty) json output")
+
+def print_output(args, output):
+    """
+    Display the response output, with option to display raw or pretty formatted
+    """
+
+    # Process incoming arguments
+    val_arg(isinstance(args.raw_output, bool), "Invalid type for raw_output")
+    val_arg(isinstance(output, str), "Invalid output supplied to print_output")
+
+    # Display output raw or pretty
     if args.raw_output:
-        print(response)
+        print(output)
     else:
-        print(json.dumps(json.loads(response), indent=4))
+        print(json.dumps(json.loads(output), indent=4))
 
 def process_args():
     """
@@ -56,10 +112,12 @@ def process_args():
         prog="csutl", description="CoinSpot Utility", exit_on_error=False
     )
 
+    parser.set_defaults(debug=False)
+
     # Parser configuration
-    parser.add_argument(
-        "-d", action="store_true", dest="debug", help="Enable debug output"
-    )
+    #parser.add_argument(
+    #    "-d", action="store_true", dest="debug", help="Enable debug output"
+    #)
 
     parser.set_defaults(call_func=None)
     subparsers = parser.add_subparsers(dest="subcommand")
@@ -70,9 +128,9 @@ def process_args():
         help="Perform a post request against the CoinSpot API"
     )
     subcommand_post.set_defaults(call_func=process_post)
+    add_common_args(subcommand_post)
 
     subcommand_post.add_argument("url", help="URL endpoint")
-    subcommand_post.add_argument("-r", action="store_true", dest="raw_output", help="Raw (unpretty) json output")
     subcommand_post.add_argument("--raw-input", action="store_true", dest="raw_input", help="Don't parse input or add nonce")
 
     # get subcommand
@@ -81,9 +139,19 @@ def process_args():
         help="Perform a get request against the CoinSpot API"
     )
     subcommand_get.set_defaults(call_func=process_get)
+    add_common_args(subcommand_get)
 
     subcommand_get.add_argument("url", help="URL endpoint")
-    subcommand_get.add_argument("-r", action="store_true", dest="raw_output", help="Raw (unpretty) json output")
+
+    # Balance
+    subcommand_balance = subparsers.add_parser(
+        "balance",
+        help="Retrieve account balance"
+    )
+    subcommand_balance.set_defaults(call_func=process_balance)
+    add_common_args(subcommand_balance)
+
+    subcommand_balance.add_argument("-t", action="store", dest="cointype", help="Coin type", default=None)
 
     # Parse arguments
     args = parser.parse_args()
