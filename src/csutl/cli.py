@@ -71,6 +71,50 @@ def process_balance(args):
 
     print_output(args, response)
 
+def process_order_history(args):
+    """
+    Process request to display order history for the account
+    """
+
+    # Api for coinspot access
+    api = CoinSpotApi()
+
+    url = "/api/v2/ro/my/orders/completed"
+
+    request = {
+        "limit": 200
+    }
+
+    # Limit to coin type, if requested
+    if args.cointype is not None:
+        val_arg(isinstance(args.cointype, str), "Invalid type for cointype")
+
+        request["cointype"] = args.cointype
+
+    # Adjust limit
+    if args.limit is not None:
+        val_arg(isinstance(args.limit, int), "Invalid type for limit")
+        # Don't validate the limit range - Let the api endpoint do this
+
+        request["limit"] = args.limit
+
+    # Start date
+    if args.start_date is not None:
+        val_arg(isinstance(args.start_date, str), "Invalid type for start date")
+
+        request["startdate"] = args.start_date
+
+    # End date
+    if args.end_date is not None:
+        val_arg(isinstance(args.end_date, str), "Invalid type for end date")
+
+        request["enddate"] = args.end_date
+
+    # Request order history
+    response = api.post(url, request)
+
+    print_output(args, response)
+
 def add_common_args(parser):
     """
     Common arguments for all subcommands
@@ -152,6 +196,19 @@ def process_args():
     add_common_args(subcommand_balance)
 
     subcommand_balance.add_argument("-t", action="store", dest="cointype", help="Coin type", default=None)
+
+    # order history
+    subcommand_order_history = subparsers.add_parser(
+        "order_history",
+        help="Retrieve account order history"
+    )
+    subcommand_order_history.set_defaults(call_func=process_order_history)
+    add_common_args(subcommand_order_history)
+
+    subcommand_order_history.add_argument("-s", action="store", dest="start_date", help="Start date", default=None)
+    subcommand_order_history.add_argument("-e", action="store", dest="end_date", help="End date", default=None)
+    subcommand_order_history.add_argument("-l", action="store", dest="limit", help="Result limit (default 200, max 500)", type=int, default=None)
+    subcommand_order_history.add_argument("-t", action="store", dest="cointype", help="coin type", default=None)
 
     # Parse arguments
     args = parser.parse_args()

@@ -29,3 +29,12 @@ class TestCli:
 
         assert ret == 0
 
+    def test_order_history1(self):
+        """
+        Test that the order history subcommand is available
+        """
+
+        ret = subprocess.call(["/work/bin/entrypoint", "order_history", "--help"])
+
+        assert ret == 0
+
