@@ -7,6 +7,9 @@ import urllib.parse
 import requests
 import logging
 import os
+import statistics
+
+from datetime import datetime, timedelta
 
 from .common import val_arg, val_run
 
@@ -142,4 +145,81 @@ class CoinSpotApi:
             headers["Sign"] = hmac.new(apisecret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha512).hexdigest()
 
         return headers
+
+    def get_price_history(self, coin, age_hours=7, stats=False):
+        """
+        Retrieve the coin price for the last x hours
+        """
+
+        # Validate incoming parameters
+        val_arg(isinstance(age_hours, int) and age_hours > 0, "Invalid age_hours specified")
+
+        # Calculate range
+        now = datetime.now()
+        end_date = now
+        start_date = (now - timedelta(hours=age_hours))
+
+        # Call get_price_history_range to make the request
+        return self.get_price_history_range(coin, start_date, end_date, stats=stats)
+
+    def get_price_history_range(self, coin, start_date, end_date, stats=False):
+        """
+        Retrieve the coin price for the specified range
+        """
+
+        # Process incoming arguments
+        val_arg(isinstance(coin, str) and coin != "", "Invalid coin type passed to get_history")
+        val_arg(isinstance(start_date, datetime), "Invalid start_date passed to get_price_history_range")
+        val_arg(isinstance(end_date, datetime), "Invalid end_date passed to get_price_history_range")
+
+        # Calculate start and end times
+        start = int(start_date.timestamp() * 1000)
+        end = int(end_date.timestamp() * 1000)
+
+        # Coinspot only recognises upper case coin types
+        coin = coin.upper()
+
+        # Build the query url
+        url = urllib.parse.urljoin(self.base_url, f"/charts/history_basic?symbol={coin}&from={start}&to={end}")
+
+        # Headers for request
+        headers = self.build_headers()
+
+        # Make request to the endpoint
+        logger.debug("url: %s", url)
+        logger.debug("headers: %s", headers)
+        response = self.requestor("get", url, headers, payload=None)
+
+        logger.debug("Response: %s", response)
+
+        if stats:
+            parsed = json.loads(response)
+
+            val_run(isinstance(parsed, list), "Invalid response from endpoint - not a list")
+            val_run(all(isinstance(x, list) for x in parsed), "Invalid response from endpoint - Some items are not lists")
+            val_run(all(len(x) == 2 for x in parsed), "Invalid response from endpoint - Elements should have two items")
+            val_run(len(parsed) > 0, "Invalid response from endpoint - Empty array")
+
+            prices = [x[1] for x in parsed]
+
+            price_first = prices[0]
+            price_last = prices[-1]
+
+            price_min = min(prices)
+            price_max = max(prices)
+
+            response = {
+                "min": price_min,
+                "max": price_max,
+                "avg": statistics.mean(prices),
+                "med": statistics.median(prices),
+                "range": price_max - price_min,
+                "growth": price_last - price_min,
+                "start_date": start_date.astimezone().isoformat(),
+                "end_date": end_date.astimezone().isoformat()
+            }
+
+            response = json.dumps(response)
+
+        return response
 
