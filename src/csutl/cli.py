@@ -24,7 +24,7 @@ def process_get(args):
     api = CoinSpotApi()
 
     # Make request against the API
-    response = api.get(args.url)
+    response = api.get(args.url, raw_output=args.raw_output)
 
     # Display output from the API, formatting if required
     print_output(args, response)
@@ -45,7 +45,7 @@ def process_post(args):
     payload = sys.stdin.read()
 
     # Make request against the API
-    response = api.post(args.url, payload, raw_payload=args.raw_input)
+    response = api.post(args.url, payload, raw_payload=args.raw_input, raw_output=args.raw_output)
 
     # Display output from the API, formatting if required
     print_output(args, response)
@@ -67,7 +67,7 @@ def process_balance(args):
         url = f"/api/v2/ro/my/balance/{args.cointype}?available=yes"
 
     # Request balance info
-    response = api.post(url, "{}")
+    response = api.post(url, "{}", raw_output=args.raw_output)
 
     print_output(args, response)
 
@@ -111,7 +111,7 @@ def process_order_history(args):
         request["enddate"] = args.end_date
 
     # Request order history
-    response = api.post(url, request)
+    response = api.post(url, request, raw_output=args.raw_output)
 
     print_output(args, response)
 

@@ -20,12 +20,6 @@ class TestCoinSpotApi:
 
         parsed = json.loads(response)
 
-        # status
-        assert "status" in parsed
-        status = parsed["status"]
-        
-        assert isinstance(status, str) and status == "ok"
-
         # prices
         assert "prices" in parsed
         prices = parsed["prices"]
@@ -44,12 +38,6 @@ class TestCoinSpotApi:
         assert isinstance(response, str)
 
         parsed = json.loads(response)
-
-        # status
-        assert "status" in parsed
-        status = parsed["status"]
-        
-        assert isinstance(status, str) and status == "ok"
 
         # prices
         assert "prices" in parsed
@@ -280,4 +268,34 @@ class TestCoinSpotApi:
 
         api = csutl.CoinSpotApi(requestor=test_requestor)
         api.post("/nowhere", {"test":"other"})
+
+    def test_prune_status1(self):
+        """
+        Test pruning of status messages
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "ok", "message": "ok", "test": "response"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        response = json.loads(api.get("/pubapi/v2/latest"))
+
+        assert "status" not in response
+        assert "message" not in response
+        assert "test" in response and response["test"] == "response"
+
+    def test_prune_status2(self):
+        """
+        Test status messages in raw response
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "ok", "message": "ok", "test": "response"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        response = json.loads(api.get("/pubapi/v2/latest", raw_output=True))
+
+        assert "status" in response and response["status"] == "ok"
+        assert "message" in response and response["message"] == "ok"
+        assert "test" in response and response["test"] == "response"
 
