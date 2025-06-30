@@ -34,11 +34,12 @@ class CoinSpotApi:
 
         self.requestor = requestor
 
-    def get(self, url):
+    def get(self, url, raw_output=False):
 
         # Process incoming arguments
         val_arg(isinstance(url, str), "Invalid url provided to CoinSpotApi.get")
         val_arg(url != "", "Empty url provided to CoinSpotApi.get")
+        val_arg(isinstance(raw_output, bool), "Invalid raw_output value supplied to CoinSpotApi.get")
 
         # Convert URL to an absolute url, if not already
         url = urllib.parse.urljoin(self.base_url, url)
@@ -53,16 +54,18 @@ class CoinSpotApi:
 
         logger.debug("Response: %s", response)
 
-        self.validate_response(response)
+        if not raw_output:
+            response = self.process_response(response)
 
         return response
 
-    def post(self, url, payload, raw_payload=False):
+    def post(self, url, payload, raw_payload=False, raw_output=False):
 
         # Process incoming arguments
         val_arg(isinstance(url, str), "Invalid url provided to CoinSpotApi.post")
         val_arg(url != "", "Empty url provided to CoinSpotApi.post")
         val_arg(isinstance(raw_payload, bool), "Invalid raw_payload argument to CoinSpotApi.post")
+        val_arg(isinstance(raw_output, bool), "Invalid raw_output value supplied to CoinSpotApi.post")
 
         # Convert payload, if required
         if not isinstance(payload, str):
@@ -88,11 +91,12 @@ class CoinSpotApi:
 
         logger.debug("Response: %s", response)
 
-        self.validate_response(response)
+        if not raw_output:
+            response = self.process_response(response)
 
         return response
 
-    def validate_response(self, response):
+    def process_response(self, response):
 
         # Validate incoming args
         val_arg(isinstance(response, str), "Invalid type for response")
@@ -103,9 +107,14 @@ class CoinSpotApi:
         # Check for status messages
         if "status" in content:
             val_run(content["status"] == "ok", "API did not return 'ok' for status")
+            content.pop("status")
 
         if "message" in content:
             val_run(content["message"] == "ok", "API did not return 'ok' for message")
+            content.pop("message")
+
+        # Return the new version of the response
+        return json.dumps(content)
 
     def build_headers(self, payload=None):
 
