@@ -185,3 +185,99 @@ class TestCoinSpotApi:
         with pytest.raises(csutl.exception.RuntimeException):
             response = api.post("/pubapi/v2/status", "{}")
 
+    def test_validate_status1(self):
+        """
+        Use the public api to check validation of status
+        """
+
+        api = csutl.CoinSpotApi()
+        api.get("/pubapi/v2/latest")
+        # Should validate the status and message fields, checking for ok
+
+    def test_validate_status2(self):
+        """
+        Check validation for an ok status and message response
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "ok", "message": "ok"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        api.get("/pubapi/v2/latest")
+
+    def test_validate_status3(self):
+        """
+        Provide a failed status, but ok message
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "bad", "message": "ok"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        with pytest.raises(csutl.exception.RuntimeException):
+            api.get("/pubapi/v2/latest")
+
+    def test_validate_status4(self):
+        """
+        Provide a failed message, but ok status
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "ok", "message": "bad"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        with pytest.raises(csutl.exception.RuntimeException):
+            api.get("/pubapi/v2/latest")
+
+    def test_validate_status5(self):
+        """
+        Provide a failed message and failed status
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "bad", "message": "bad"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        with pytest.raises(csutl.exception.RuntimeException):
+            api.get("/pubapi/v2/latest")
+
+    def test_post_obj1(self):
+        """
+        Test post for a string object.
+        Post should support both strings and other objects
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            content = json.loads(payload)
+
+            assert "test" in content
+            assert content["test"] == "other"
+
+            return "{}"
+
+        os.environ["COINSPOT_API_KEY"] = "apikey"
+        os.environ["COINSPOT_API_SECRET"] = "apisecret"
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        api.post("/nowhere", "{\"test\":\"other\"}")
+
+    def test_post_obj1(self):
+        """
+        Test post for a custom object
+        Post should support both strings and other objects
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            content = json.loads(payload)
+
+            assert "test" in content
+            assert content["test"] == "other"
+
+            return "{}"
+
+        os.environ["COINSPOT_API_KEY"] = "apikey"
+        os.environ["COINSPOT_API_SECRET"] = "apisecret"
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        api.post("/nowhere", {"test":"other"})
+

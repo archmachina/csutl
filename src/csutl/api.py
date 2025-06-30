@@ -53,6 +53,8 @@ class CoinSpotApi:
 
         logger.debug("Response: %s", response)
 
+        self.validate_response(response)
+
         return response
 
     def post(self, url, payload, raw_payload=False):
@@ -61,7 +63,10 @@ class CoinSpotApi:
         val_arg(isinstance(url, str), "Invalid url provided to CoinSpotApi.post")
         val_arg(url != "", "Empty url provided to CoinSpotApi.post")
         val_arg(isinstance(raw_payload, bool), "Invalid raw_payload argument to CoinSpotApi.post")
-        val_arg(isinstance(payload, str), "Invalid payload type passed to CoinSpotApi.post")
+
+        # Convert payload, if required
+        if not isinstance(payload, str):
+            payload = json.dumps(payload)
 
         # Convert URL to an absolute url, if not already
         url = urllib.parse.urljoin(self.base_url, url)
@@ -83,7 +88,24 @@ class CoinSpotApi:
 
         logger.debug("Response: %s", response)
 
+        self.validate_response(response)
+
         return response
+
+    def validate_response(self, response):
+
+        # Validate incoming args
+        val_arg(isinstance(response, str), "Invalid type for response")
+
+        # Deserialise response
+        content = json.loads(response)
+
+        # Check for status messages
+        if "status" in content:
+            val_run(content["status"] == "ok", "API did not return 'ok' for status")
+
+        if "message" in content:
+            val_run(content["message"] == "ok", "API did not return 'ok' for message")
 
     def build_headers(self, payload=None):
 
@@ -111,5 +133,4 @@ class CoinSpotApi:
             headers["Sign"] = hmac.new(apisecret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha512).hexdigest()
 
         return headers
-
 
