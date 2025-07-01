@@ -8,6 +8,7 @@ import requests
 import logging
 import os
 import statistics
+import math
 
 from datetime import datetime, timedelta
 
@@ -201,6 +202,7 @@ class CoinSpotApi:
             val_run(len(parsed) > 0, "Invalid response from endpoint - Empty array")
 
             prices = [x[1] for x in parsed]
+            val_run(all(not math.isnan(x) for x in prices), "Invalid response from endpoint - NaN values")
 
             price_first = prices[0]
             price_last = prices[-1]
@@ -208,18 +210,38 @@ class CoinSpotApi:
             price_min = min(prices)
             price_max = max(prices)
 
-            response = {
+            quartiles = statistics.quantiles(prices)
+            quartile_index = sum(1 for x in quartiles if price_last > x)
+
+            width = price_max - price_min
+            width_index = (price_last - price_min) / width
+
+            median = statistics.median(prices)
+            pstdev = statistics.pstdev(prices)
+            pstdev_index = (price_last - median) / pstdev
+
+            stats_response = {
+                "start_date": start_date.astimezone().isoformat(),
+                "end_date": end_date.astimezone().isoformat(),
+                "coin": coin,
+                "first": price_first,
+                "last": price_last,
                 "min": price_min,
                 "max": price_max,
                 "avg": statistics.mean(prices),
-                "med": statistics.median(prices),
-                "range": price_max - price_min,
+                "med": median,
+                "width": width,
                 "growth": price_last - price_min,
-                "start_date": start_date.astimezone().isoformat(),
-                "end_date": end_date.astimezone().isoformat()
+                "quartiles": quartiles,
+                "pstdev": statistics.pstdev(prices),
+                "latest": {
+                    "quartile_index": quartile_index,
+                    "width_index": width_index,
+                    "pstdev_index": pstdev_index
+                }
             }
 
-            response = json.dumps(response)
+            response = json.dumps(stats_response)
 
         return response
 

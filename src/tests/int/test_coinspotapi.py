@@ -6,6 +6,8 @@ import csutl
 import json
 import os
 
+from datetime import datetime, timedelta
+
 class TestCoinSpotApi:
     def test_public_api1(self):
         """
@@ -287,6 +289,74 @@ class TestCoinSpotApi:
     def test_prune_status2(self):
         """
         Test status messages in raw response
+        """
+
+        def test_requestor(method, url, headers, payload=None):
+            return json.dumps({"status": "ok", "message": "ok", "test": "response"})
+
+        api = csutl.CoinSpotApi(requestor=test_requestor)
+        response = json.loads(api.get("/pubapi/v2/latest", raw_output=True))
+
+        assert "status" in response and response["status"] == "ok"
+        assert "message" in response and response["message"] == "ok"
+        assert "test" in response and response["test"] == "response"
+
+    def test_price_history1(self):
+        """
+        Test access to public pricing history api
+        """
+
+        api = csutl.CoinSpotApi()
+        response = json.loads(api.get_price_history("BTC", age_hours=1))
+
+        assert isinstance(response, list)
+        assert len(response) > 0
+        assert all(isinstance(x, list) for x in response)
+        assert all(len(x) == 2 for x in response)
+        assert all(isinstance(x[0], (int, float)) for x in response)
+        assert all(isinstance(x[1], (int, float)) for x in response)
+
+    def test_price_history2(self):
+        """
+        Test access to public pricing history api and stat generation
+        """
+
+        api = csutl.CoinSpotApi()
+        response = json.loads(api.get_price_history("BTC", age_hours=1, stats=True))
+
+        start_date = datetime.fromisoformat(response["start_date"])
+        end_date = datetime.fromisoformat(response["end_date"])
+
+        assert start_date > (datetime.now().astimezone() - timedelta(hours=2))
+        assert end_date > (datetime.now().astimezone() - timedelta(hours=1))
+
+        assert "coin" in response and response["coin"] == "BTC"
+        assert "min" in response and isinstance(response["min"], (int, float))
+        assert "max" in response and isinstance(response["max"], (int, float))
+        assert "avg" in response and isinstance(response["avg"], (int, float))
+        assert "med" in response and isinstance(response["med"], (int, float))
+        assert "width" in response and isinstance(response["width"], (int, float))
+        assert "growth" in response and isinstance(response["growth"], (int, float))
+
+        assert "quartiles" in response and isinstance(response["quartiles"], list)
+        assert len(response["quartiles"]) == 3
+        assert all(isinstance(x, (float, int)) for x in response["quartiles"])
+
+        assert "pstdev" in response and isinstance(response["pstdev"], (int, float))
+        assert "latest" in response and isinstance(response["latest"], dict)
+
+        assert "quartile_index" in response["latest"]
+        assert isinstance(response["latest"]["quartile_index"], (int, float))
+
+        assert "width_index" in response["latest"]
+        assert isinstance(response["latest"]["width_index"], (int, float))
+
+        assert "pstdev_index" in response["latest"]
+        assert isinstance(response["latest"]["pstdev_index"], (int, float))
+
+    def test_price_history3(self):
+        """
+        Test access to public pricing history api
         """
 
         def test_requestor(method, url, headers, payload=None):
