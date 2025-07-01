@@ -71,6 +71,30 @@ def process_balance(args):
 
     print_output(args, response)
 
+def process_price_history(args):
+    """
+    Process request to display price history for a coin type
+    """
+
+    # Validate incoming arguments
+    val_arg(isinstance(args.cointype, str) and args.cointype != "", "Invalid cointype supplied")
+    val_arg(args.age > 0, "Invalid age supplied")
+    val_arg(isinstance(args.interval, str), "Invalid value for interval")
+    val_arg(args.interval == "hours" or args.interval == "days", "Invalid value for interval")
+
+    # Api for coinspot access
+    api = CoinSpotApi()
+
+    # Calculate age for query
+    age_hours = args.age
+    if args.interval == "days":
+        age_hours = age_hours * 24
+
+    # Request balance info
+    response = api.get_price_history(args.cointype, age_hours=age_hours, stats=args.stats)
+
+    print_output(args, response)
+
 def process_order_history(args):
     """
     Process request to display order history for the account
@@ -196,6 +220,19 @@ def process_args():
     add_common_args(subcommand_balance)
 
     subcommand_balance.add_argument("-t", action="store", dest="cointype", help="Coin type", default=None)
+
+    # Price history
+    subcommand_price_history = subparsers.add_parser(
+        "price_history",
+        help="Retrieve price history"
+    )
+    subcommand_price_history.set_defaults(call_func=process_price_history)
+    add_common_args(subcommand_price_history)
+
+    subcommand_price_history.add_argument("-s", action="store_true", dest="stats", help="Display stats")
+    subcommand_price_history.add_argument("-a", action="store", dest="age", type=int, help="Age", default=1)
+    subcommand_price_history.add_argument("-i", action="store", dest="interval", type=str, help="Interval - days or hours", choices=["days", "hours"], default="hours")
+    subcommand_price_history.add_argument("cointype", action="store", help="Coin type")
 
     # order history
     subcommand_order_history = subparsers.add_parser(
