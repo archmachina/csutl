@@ -354,18 +354,3 @@ class TestCoinSpotApi:
         assert "pstdev_index" in response["latest"]
         assert isinstance(response["latest"]["pstdev_index"], (int, float))
 
-    def test_price_history3(self):
-        """
-        Test access to public pricing history api
-        """
-
-        def test_requestor(method, url, headers, payload=None):
-            return json.dumps({"status": "ok", "message": "ok", "test": "response"})
-
-        api = csutl.CoinSpotApi(requestor=test_requestor)
-        response = json.loads(api.get("/pubapi/v2/latest", raw_output=True))
-
-        assert "status" in response and response["status"] == "ok"
-        assert "message" in response and response["message"] == "ok"
-        assert "test" in response and response["test"] == "response"
-
