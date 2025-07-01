@@ -220,6 +220,9 @@ class CoinSpotApi:
             pstdev = statistics.pstdev(prices)
             pstdev_index = (price_last - median) / pstdev
 
+            growth = price_last - price_first
+            growth_pct = growth / price_first * 100
+
             stats_response = {
                 "start_date": start_date.astimezone().isoformat(),
                 "end_date": end_date.astimezone().isoformat(),
@@ -231,7 +234,8 @@ class CoinSpotApi:
                 "avg": statistics.mean(prices),
                 "med": median,
                 "width": width,
-                "growth": price_last - price_min,
+                "growth": price_last - price_first,
+                "growth_pct": growth_pct,
                 "quartiles": quartiles,
                 "pstdev": statistics.pstdev(prices),
                 "latest": {

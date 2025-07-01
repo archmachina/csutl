@@ -337,6 +337,7 @@ class TestCoinSpotApi:
         assert "med" in response and isinstance(response["med"], (int, float))
         assert "width" in response and isinstance(response["width"], (int, float))
         assert "growth" in response and isinstance(response["growth"], (int, float))
+        assert "growth_pct" in response and isinstance(response["growth_pct"], (int, float))
 
         assert "quartiles" in response and isinstance(response["quartiles"], list)
         assert len(response["quartiles"]) == 3
