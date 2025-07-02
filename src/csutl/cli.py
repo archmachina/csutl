@@ -139,6 +139,138 @@ def process_order_history(args):
 
     print_output(args, response)
 
+def process_market_buy(args):
+    """
+    Place market buy order
+    """
+
+    # Validate incoming parameters
+    val_arg(isinstance(args.rate, (float, type(None))), "Invalid type for rate")
+    val_arg(isinstance(args.amount, float), "Invalid type for amount")
+
+    # Coinspot api
+    api = CoinSpotApi()
+
+    url = "/api/v2/my/buy"
+
+    # Determine the rate - If there is no rate supplied, then use the asking
+    # price from the API to determine the buy price
+    rate = args.rate
+    if rate is None:
+        prices = json.loads(api.get(f"/pubapi/v2/latest/{args.cointype}"))
+        logger.info("Current prices: %s", prices["prices"])
+        rate = prices["prices"]["ask"]
+
+    rate = float(rate)
+
+    amount = args.amount
+    if args.amount_type == "aud":
+        amount = amount/rate
+        logger.info("Calculated coin quantity: %s", amount)
+
+    logger.info("Effective aud amount: %s", round(amount, 8) * rate)
+
+    request = {
+        "cointype": args.cointype,
+        "amount": amount,
+        "rate": rate
+    }
+
+    # Lodge the buy request
+    response = api.post(url, request, raw_output=args.raw_output)
+
+    print_output(args, response)
+
+def process_market_sell(args):
+    """
+    Place market sell order
+    """
+
+    # Validate incoming parameters
+    val_arg(isinstance(args.rate, (float, type(None))), "Invalid type for rate")
+    val_arg(isinstance(args.amount, float), "Invalid type for amount")
+
+    # Coinspot api
+    api = CoinSpotApi()
+
+    url = "/api/v2/my/sell"
+
+    # Determine the rate - If there is no rate supplied, then use the bidding
+    # price from the API to determine the sell price
+    rate = args.rate
+    if rate is None:
+        prices = json.loads(api.get(f"/pubapi/v2/latest/{args.cointype}"))
+        logger.info("Current prices: %s", prices["prices"])
+        rate = prices["prices"]["bid"]
+
+    rate = float(rate)
+
+    amount = args.amount
+    if args.amount_type == "aud":
+        amount = amount/rate
+        logger.info("Calculated coin quantity: %s", amount)
+
+    amount = round(amount, 8)
+    logger.info("Effective aud amount: %s", amount * rate)
+
+    request = {
+        "cointype": args.cointype,
+        "amount": amount,
+        "rate": rate
+    }
+
+    # Lodge the sell request
+    response = api.post(url, request, raw_output=args.raw_output)
+
+    print_output(args, response)
+
+def process_market_orders(args):
+    """
+    Display open market orders
+    """
+
+    # Coinspot api
+    api = CoinSpotApi()
+
+    url = "/api/v2/ro/my/orders/market/open"
+    if args.completed:
+        url = "/api/v2/ro/my/orders/market/completed"
+
+    request = {
+        "limit": 200
+    }
+
+    # Limit to coin type, if requested
+    if args.cointype is not None:
+        val_arg(isinstance(args.cointype, str), "Invalid type for cointype")
+        val_arg(args.cointype != "", "Invalid value for cointype")
+
+        request["cointype"] = args.cointype
+
+    # Adjust limit
+    if args.limit is not None:
+        val_arg(isinstance(args.limit, int), "Invalid type for limit")
+        # Don't validate the limit range - Let the api endpoint do this
+
+        request["limit"] = args.limit
+
+    # Start date
+    if args.start_date is not None:
+        val_arg(isinstance(args.start_date, str), "Invalid type for start date")
+
+        request["startdate"] = args.start_date
+
+    # End date
+    if args.end_date is not None:
+        val_arg(isinstance(args.end_date, str), "Invalid type for end date")
+
+        request["enddate"] = args.end_date
+
+    # Request market orders
+    response = api.post(url, request, raw_output=args.raw_output)
+
+    print_output(args, response)
+
 def add_common_args(parser):
     """
     Common arguments for all subcommands
@@ -247,6 +379,53 @@ def process_args():
     subcommand_order_history.add_argument("-l", action="store", dest="limit", help="Result limit (default 200, max 500)", type=int, default=None)
     subcommand_order_history.add_argument("-t", action="store", dest="cointype", help="coin type", default=None)
 
+    # market orders
+    subcommand_market = subparsers.add_parser(
+        "market",
+        help="Market orders"
+    )
+    subparsers_market = subcommand_market.add_subparsers(dest="market_subcommand")
+
+    # Market orders
+    subcommand_market_orders = subparsers_market.add_parser(
+        "orders",
+        help="Market orders"
+    )
+    subcommand_market_orders.set_defaults(call_func=process_market_orders)
+    add_common_args(subcommand_market_orders)
+
+    subcommand_market_orders.add_argument("-s", action="store", dest="start_date", help="Start date", default=None)
+    subcommand_market_orders.add_argument("-e", action="store", dest="end_date", help="End date", default=None)
+    subcommand_market_orders.add_argument("-l", action="store", dest="limit", help="Result limit (default 200, max 500)", type=int, default=None)
+    subcommand_market_orders.add_argument("-t", action="store", dest="cointype", help="coin type", default=None)
+    subcommand_market_orders.add_argument("-c", action="store_true", dest="completed", help="Show completed orders")
+
+    # Market buy order
+    subcommand_market_buy = subparsers_market.add_parser(
+        "buy",
+        help="Place buy order"
+    )
+    subcommand_market_buy.set_defaults(call_func=process_market_buy)
+    add_common_args(subcommand_market_buy)
+
+    subcommand_market_buy.add_argument("cointype", action="store", help="coin type")
+    subcommand_market_buy.add_argument("amount_type", action="store", help="Amount type", choices=("aud", "coin"))
+    subcommand_market_buy.add_argument("amount", action="store", help="Amount", type=float)
+    subcommand_market_buy.add_argument("-r", action="store", dest="rate", help="rate", default=None, type=float)
+
+    # Market sell order
+    subcommand_market_sell = subparsers_market.add_parser(
+        "sell",
+        help="Place sell order"
+    )
+    subcommand_market_sell.set_defaults(call_func=process_market_sell)
+    add_common_args(subcommand_market_sell)
+
+    subcommand_market_sell.add_argument("cointype", action="store", help="coin type")
+    subcommand_market_sell.add_argument("amount_type", action="store", help="Amount type", choices=("aud", "coin"))
+    subcommand_market_sell.add_argument("amount", action="store", help="Amount", type=float)
+    subcommand_market_sell.add_argument("-r", action="store", dest="rate", help="rate", default=None, type=float)
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -264,6 +443,7 @@ def process_args():
     # Run the sub command
     if args.call_func is None:
         logger.error("Missing subcommand")
+        parser.print_help()
         return 1
 
     return args.call_func(args)
