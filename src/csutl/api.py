@@ -213,6 +213,9 @@ class CoinSpotApi:
             quartiles = statistics.quantiles(prices)
             quartile_index = sum(1 for x in quartiles if price_last > x)
 
+            ten_quantiles = statistics.quantiles(prices, n=10)
+            ten_quantile_index = sum(1 for x in ten_quantiles if price_last > x)
+
             width = price_max - price_min
             width_index = (price_last - price_min) / width
 
@@ -237,9 +240,11 @@ class CoinSpotApi:
                 "growth": price_last - price_first,
                 "growth_pct": growth_pct,
                 "quartiles": quartiles,
+                "ten_quantiles": ten_quantiles,
                 "pstdev": statistics.pstdev(prices),
                 "latest": {
                     "quartile_index": quartile_index,
+                    "ten_quantile_index": ten_quantile_index,
                     "width_index": width_index,
                     "pstdev_index": pstdev_index
                 }
