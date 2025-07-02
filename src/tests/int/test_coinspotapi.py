@@ -348,17 +348,26 @@ class TestCoinSpotApi:
         assert all(isinstance(x, (float, int)) for x in response["ten_quantiles"])
 
         assert "pstdev" in response and isinstance(response["pstdev"], (int, float))
-        assert "latest" in response and isinstance(response["latest"], dict)
+        assert "reference" in response and isinstance(response["reference"], dict)
 
-        assert "quartile_index" in response["latest"]
-        assert isinstance(response["latest"]["quartile_index"], (int, float))
+        assert "quartile_index" in response["reference"]
+        assert isinstance(response["reference"]["quartile_index"], (int, float))
 
-        assert "ten_quantile_index" in response["latest"]
-        assert isinstance(response["latest"]["ten_quantile_index"], (int, float))
+        assert "ten_quantile_index" in response["reference"]
+        assert isinstance(response["reference"]["ten_quantile_index"], (int, float))
 
-        assert "width_index" in response["latest"]
-        assert isinstance(response["latest"]["width_index"], (int, float))
+        assert "width_index" in response["reference"]
+        assert isinstance(response["reference"]["width_index"], (int, float))
 
-        assert "pstdev_index" in response["latest"]
-        assert isinstance(response["latest"]["pstdev_index"], (int, float))
+        assert "pstdev_index" in response["reference"]
+        assert isinstance(response["reference"]["pstdev_index"], (int, float))
+
+        assert "avg_price_diff_pct" in response["reference"]
+        assert isinstance(response["reference"]["avg_price_diff_pct"], (int, float))
+
+        assert "med_price_diff_pct" in response["reference"]
+        assert isinstance(response["reference"]["med_price_diff_pct"], (int, float))
+
+        assert "max_price_diff_pct" in response["reference"]
+        assert isinstance(response["reference"]["max_price_diff_pct"], (int, float))
 
