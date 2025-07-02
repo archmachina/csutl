@@ -81,6 +81,7 @@ def process_price_history(args):
     val_arg(args.age > 0, "Invalid age supplied")
     val_arg(isinstance(args.interval, str), "Invalid value for interval")
     val_arg(args.interval == "hours" or args.interval == "days", "Invalid value for interval")
+    val_arg(isinstance(args.reference_price, (float, int, type(None))), "Invalid reference price supplied")
 
     # Api for coinspot access
     api = CoinSpotApi()
@@ -91,7 +92,7 @@ def process_price_history(args):
         age_hours = age_hours * 24
 
     # Request balance info
-    response = api.get_price_history(args.cointype, age_hours=age_hours, stats=args.stats)
+    response = api.get_price_history(args.cointype, age_hours=age_hours, stats=args.stats, reference_price=args.reference_price)
 
     print_output(args, response)
 
@@ -364,6 +365,7 @@ def process_args():
     subcommand_price_history.add_argument("-s", action="store_true", dest="stats", help="Display stats")
     subcommand_price_history.add_argument("-a", action="store", dest="age", type=int, help="Age", default=1)
     subcommand_price_history.add_argument("-i", action="store", dest="interval", type=str, help="Interval - days or hours", choices=["days", "hours"], default="hours")
+    subcommand_price_history.add_argument("-r", action="store", dest="reference_price", type=float, help="Reference price", default=None)
     subcommand_price_history.add_argument("cointype", action="store", help="Coin type")
 
     # order history

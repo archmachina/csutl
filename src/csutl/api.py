@@ -147,7 +147,7 @@ class CoinSpotApi:
 
         return headers
 
-    def get_price_history(self, coin, age_hours=7, stats=False):
+    def get_price_history(self, coin, age_hours=7, stats=False, reference_price=None):
         """
         Retrieve the coin price for the last x hours
         """
@@ -161,9 +161,9 @@ class CoinSpotApi:
         start_date = (now - timedelta(hours=age_hours))
 
         # Call get_price_history_range to make the request
-        return self.get_price_history_range(coin, start_date, end_date, stats=stats)
+        return self.get_price_history_range(coin, start_date, end_date, stats=stats, reference_price=reference_price)
 
-    def get_price_history_range(self, coin, start_date, end_date, stats=False):
+    def get_price_history_range(self, coin, start_date, end_date, stats=False, reference_price=None):
         """
         Retrieve the coin price for the specified range
         """
@@ -172,6 +172,7 @@ class CoinSpotApi:
         val_arg(isinstance(coin, str) and coin != "", "Invalid coin type passed to get_history")
         val_arg(isinstance(start_date, datetime), "Invalid start_date passed to get_price_history_range")
         val_arg(isinstance(end_date, datetime), "Invalid end_date passed to get_price_history_range")
+        val_arg(isinstance(reference_price, (int, float, type(None))), "Invalid reference price passed to get_price_history_range")
 
         # Calculate start and end times
         start = int(start_date.timestamp() * 1000)
@@ -210,21 +211,28 @@ class CoinSpotApi:
             price_min = min(prices)
             price_max = max(prices)
 
+            avg = statistics.mean(prices)
+
             quartiles = statistics.quantiles(prices)
-            quartile_index = sum(1 for x in quartiles if price_last > x)
 
             ten_quantiles = statistics.quantiles(prices, n=10)
-            ten_quantile_index = sum(1 for x in ten_quantiles if price_last > x)
 
             width = price_max - price_min
-            width_index = (price_last - price_min) / width
 
             median = statistics.median(prices)
             pstdev = statistics.pstdev(prices)
-            pstdev_index = (price_last - median) / pstdev
 
             growth = price_last - price_first
             growth_pct = growth / price_first * 100
+
+            # Indexes
+            if reference_price is None:
+                reference_price = price_last
+
+            ten_quantile_index = sum(1 for x in ten_quantiles if reference_price > x)
+            quartile_index = sum(1 for x in quartiles if reference_price > x)
+            pstdev_index = (reference_price - median) / pstdev
+            width_index = (reference_price - price_min) / width
 
             stats_response = {
                 "start_date": start_date.astimezone().isoformat(),
@@ -234,7 +242,7 @@ class CoinSpotApi:
                 "last": price_last,
                 "min": price_min,
                 "max": price_max,
-                "avg": statistics.mean(prices),
+                "avg": avg,
                 "med": median,
                 "width": width,
                 "growth": price_last - price_first,
@@ -242,11 +250,15 @@ class CoinSpotApi:
                 "quartiles": quartiles,
                 "ten_quantiles": ten_quantiles,
                 "pstdev": statistics.pstdev(prices),
-                "latest": {
+                "reference": {
+                    "reference_price": reference_price,
                     "quartile_index": quartile_index,
                     "ten_quantile_index": ten_quantile_index,
                     "width_index": width_index,
-                    "pstdev_index": pstdev_index
+                    "pstdev_index": pstdev_index,
+                    "avg_price_diff_pct": (avg / reference_price - 1)*100,
+                    "med_price_diff_pct": (median / reference_price - 1)*100,
+                    "max_price_diff_pct": (price_max / reference_price - 1)*100
                 }
             }
 
