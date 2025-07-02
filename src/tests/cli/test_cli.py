@@ -109,3 +109,30 @@ class TestCli:
         assert "pstdev_index" in response["latest"]
         assert isinstance(response["latest"]["pstdev_index"], (int, float))
 
+    def test_market_orders1(self):
+        """
+        Test that the market orders subcommand is available
+        """
+
+        ret = subprocess.call(["/work/bin/entrypoint", "market", "orders", "--help"])
+
+        assert ret == 0
+
+    def test_market_buy1(self):
+        """
+        Test that the market buy subcommand is available
+        """
+
+        ret = subprocess.call(["/work/bin/entrypoint", "market", "buy", "--help"])
+
+        assert ret == 0
+
+    def test_market_sell1(self):
+        """
+        Test that the market sell subcommand is available
+        """
+
+        ret = subprocess.call(["/work/bin/entrypoint", "market", "sell", "--help"])
+
+        assert ret == 0
+
