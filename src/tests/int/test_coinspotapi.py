@@ -343,11 +343,18 @@ class TestCoinSpotApi:
         assert len(response["quartiles"]) == 3
         assert all(isinstance(x, (float, int)) for x in response["quartiles"])
 
+        assert "ten_quantiles" in response and isinstance(response["ten_quantiles"], list)
+        assert len(response["ten_quantiles"]) == 9
+        assert all(isinstance(x, (float, int)) for x in response["ten_quantiles"])
+
         assert "pstdev" in response and isinstance(response["pstdev"], (int, float))
         assert "latest" in response and isinstance(response["latest"], dict)
 
         assert "quartile_index" in response["latest"]
         assert isinstance(response["latest"]["quartile_index"], (int, float))
+
+        assert "ten_quantile_index" in response["latest"]
+        assert isinstance(response["latest"]["ten_quantile_index"], (int, float))
 
         assert "width_index" in response["latest"]
         assert isinstance(response["latest"]["width_index"], (int, float))
