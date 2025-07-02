@@ -78,21 +78,30 @@ def process_price_history(args):
 
     # Validate incoming arguments
     val_arg(isinstance(args.cointype, str) and args.cointype != "", "Invalid cointype supplied")
-    val_arg(args.age > 0, "Invalid age supplied")
-    val_arg(isinstance(args.interval, str), "Invalid value for interval")
-    val_arg(args.interval == "hours" or args.interval == "days", "Invalid value for interval")
     val_arg(isinstance(args.reference_price, (float, int, type(None))), "Invalid reference price supplied")
+    val_arg(args.age != "", "Invalid age supplied")
+
+    # Parse age
+    age = args.age
+    mod = 1
+
+    if age.endswith("h"):
+        age = age[:-1]
+    elif age.endswith("d"):
+        age = age[:-1]
+        mod = 24
+    elif age.endswith("w"):
+        age = age[:-1]
+        mod = 24 * 7
+
+    val_arg(age.isdigit(), f"Age is not a valid format: {age}")
+    age = int(age) * mod
 
     # Api for coinspot access
     api = CoinSpotApi()
 
-    # Calculate age for query
-    age_hours = args.age
-    if args.interval == "days":
-        age_hours = age_hours * 24
-
     # Request balance info
-    response = api.get_price_history(args.cointype, age_hours=age_hours, stats=args.stats, reference_price=args.reference_price)
+    response = api.get_price_history(args.cointype, age_hours=age, stats=args.stats, reference_price=args.reference_price)
 
     print_output(args, response)
 
@@ -363,8 +372,7 @@ def process_args():
     add_common_args(subcommand_price_history)
 
     subcommand_price_history.add_argument("-s", action="store_true", dest="stats", help="Display stats")
-    subcommand_price_history.add_argument("-a", action="store", dest="age", type=int, help="Age", default=1)
-    subcommand_price_history.add_argument("-i", action="store", dest="interval", type=str, help="Interval - days or hours", choices=["days", "hours"], default="hours")
+    subcommand_price_history.add_argument("-a", action="store", dest="age", help="Age (e.g. 4h or 3d) (default 1d)", default="1d")
     subcommand_price_history.add_argument("-r", action="store", dest="reference_price", type=float, help="Reference price", default=None)
     subcommand_price_history.add_argument("cointype", action="store", help="Coin type")
 
