@@ -281,6 +281,116 @@ def process_market_orders(args):
 
     print_output(args, response)
 
+def migratedb(connection):
+    pass
+
+def process_manager_run(args):
+    """
+    Perform a run of the manager rules
+    """
+
+    # Read configuration file
+    val_arg(args.config != "", "Invalid configuration file path supplied")
+    with open(args.config, "r", encoding="utf8") as file:
+        config = yaml.safe_load(file)
+
+    # Open sqlite database
+    val_arg(args.statefile != "", "Invalid state file path supplied")
+    con = sqlite3.connect(args.statefile)
+
+    # Api for interacting with CoinSpo
+    api = CoinSpotApi()
+
+    # Perform migrations against the database
+    migrate_db(con)
+
+    # Templating session
+    session = obslib.Session(template_vars={})
+
+    # Extract vars from configuration file
+    config_vars = obslib.extract_property(config, "vars", on_missing=None)
+    config_vars = session.resolve(config_vars, (dict, type(None)), depth=0, on_none={})
+    session = obslib.Session(template_vars=config_vars)
+
+    # Get coin types from the configuration file
+    coins = obslib.extract_property(config, "coins", on_missing=None)
+    coins = session.resolve(coins, (dict, type(None)), depth=0, on_none={})
+
+    # Validate no unknown keys
+    val_load(len(config.keys()) == 0, f"Unknown keys in config: {config.keys()}")
+
+    # For each coin type
+    for coin in coins:
+
+        # Get a list of groups for this coin
+        groups = obslib.extract_property(coin, "groups", on_missing=None)
+        groups = session.resolve(groups, (dict, type(None)), depth=0, on_none={})
+
+        # Validate no unknown keys
+        val_load(len(coin.keys()) == 0, f"Unknown keys in coin config: {coin.keys()}")
+
+        # For each coin group
+        for group in groups:
+
+            # Determine the pricing history range for the group
+            history = obslib.extract_property(group, "history", on_missing=None)
+            history = session.resolve(history, int, on_none=24)
+
+            # Get a list of buy rules for this group
+            buy_rules_any = obslib.extract_property(group, "buy_rules_any", on_missing=None)
+            buy_rules_any = session.resolve(buy_rules_any, list, on_none=[], depth=0)
+
+            buy_rules_all = obslib.extract_property(group, "buy_rules_all", on_missing=None)
+            buy_rules_all = session.resolve(buy_rules_all, list, on_none=[], depth=0)
+
+            # Purchase amount (aud)
+            amount = obslib.extract_property(group, "amount")
+            amount = session.resolve(amount, float)
+
+            # Validate no unknown keys
+            val_load(len(group.keys()) == 0, f"Unknown keys in group config: {group.keys()}")
+
+            # Retrieve the current AUD balance
+            response = api.post(f"/api/v2/ro/my/balance/aud?available=yes")
+            response = json.loads(response)
+            val_run("balance" in response, "Missing balance key in coinspot API response")
+            val_run("AUD" in response["balance"], "Missing AUD key in coinspot API response")
+            val_run("available" in response["balance"]["AUD"], "Missing available amount in coinspot API response")
+            aud_available = float(response["balance"]["AUD"]["available"])
+            
+            logger.info("AUD available: %s", aud_balance)
+
+            # Stop here if the balance can't meet the purchase amount
+            if aud_available < amount):
+                logger.info(f"Available balance can't meet the purchase amount: {amount}")
+
+            # Retrieve the current coin balance
+            response = api.post(f"/api/v2/ro/my/balance/{coin}?available=yes")
+            coin_balance = json.loads(response)
+            logger.info("%s Balance: %s", coin, coin_balance)
+
+            # Retrieve the current coin prices
+            response = api.post(f"/pubapi/v2/latest/{coin}")
+            coin_prices = json.loads(response)
+            logger.info("Coin prices: %s", coin_price)
+
+            # Retrieve coin pricing statistics
+            bid_price = float(coin_prices["prices"]["bid"])
+            api.get_price_history(coin, age_hours=history, stats=True, reference_price=bid_price)
+
+            # Evaluate rules
+            buy_any = any([session.resolve(x, bool) for x in buy_rules_any])
+            if not all([session.resolve(x, bool) for x in buy_rules_all]):
+                # Did not satisfy all of the 'all' rules
+                continue
+
+            if len(buy_rules_any) > 0 and not any([session.resolve(x, bool) for x in buy_rules_any]):
+                # There are 'any' rules and none matched
+                continue
+
+            # Rules confirm that a purchase should be made
+
+
 def add_common_args(parser):
     """
     Common arguments for all subcommands
@@ -435,6 +545,24 @@ def process_args():
     subcommand_market_sell.add_argument("amount_type", action="store", help="Amount type", choices=("aud", "coin"))
     subcommand_market_sell.add_argument("amount", action="store", help="Amount", type=float)
     subcommand_market_sell.add_argument("-r", action="store", dest="rate", help="rate", default=None, type=float)
+
+    # manager
+    subcommand_manager = subparsers.add_parser(
+        "manager",
+        help="buy/sell manager"
+    )
+    subparsers_manager = subcommand_manager.add_subparsers(dest="manager_subcommand")
+
+    # Manager run
+    subcommand_manager_run = subparsers_manager.add_parser(
+        "orders",
+        help="Market orders"
+    )
+    subcommand_manager_run.set_defaults(call_func=process_manager_run)
+    add_common_args(subcommand_manager_run)
+
+    subcommand_manager_run.add_argument("config", action="store", help="Config file")
+    subcommand_manager_run.add_argument("statefile", action="store", help="State file")
 
     # Parse arguments
     args = parser.parse_args()
