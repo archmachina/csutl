@@ -281,6 +281,128 @@ def process_market_orders(args):
 
     print_output(args, response)
 
+def process_simple_buy_sell(args):
+    """
+    Process simple buy sell
+    """
+
+    # Validate incoming parameters
+    val_arg(args.cointype != "", "Invalid cointype supplied")
+    val_arg(args.age != "", "Invalid age supplied")
+    val_arg(isinstance(args.amount, float), "Invalid amount supplied")
+    val_arg(args.amount > 0, "Invalid amount supplied")
+    val_arg(isinstance(args.buy_pct, float), "Invalid buy pct supplied")
+    val_arg(isinstance(args.sell_pct, float), "Invalid sell pct supplied")
+    val_arg(isinstance(args.limit, int), "Invalid limit supplied")
+    val_arg(args.limit > 0, "Invalid limit supplied")
+
+    # Coinspot api
+    api = CoinSpotApi()
+
+    # Parse age
+    age = args.age
+    mod = 1
+
+    if age.endswith("h"):
+        age = age[:-1]
+    elif age.endswith("d"):
+        age = age[:-1]
+        mod = 24
+    elif age.endswith("w"):
+        age = age[:-1]
+        mod = 24 * 7
+
+    val_arg(age.isdigit(), f"Age is not a valid format: {age}")
+    age = int(age) * mod
+    logger.info("Price history for last %s hours", age)
+
+    # Coin should be uppercase
+    coin = args.cointype.upper()
+
+    # Retrieve amount available from balance
+    response = json.loads(api.post("/api/v2/ro/my/balance/aud?available=yes", {}))
+    val_run("balance" in response, "Missing balance key in coinspot API response")
+    val_run("AUD" in response["balance"], "Missing AUD key in coinspot API response")
+    val_run("available" in response["balance"]["AUD"], "Missing available amount in coinspot API response")
+    aud_available = float(response["balance"]["AUD"]["available"])
+
+    logger.info("AUD available: %s", aud_available)
+
+    # Stop here if the balance can't meet the purchase amount
+    if aud_available < args.amount:
+        logger.info(f"Available balance can't meet the purchase amount: {args.amount}")
+        return
+
+    # Retrieve the current coin prices
+    response = json.loads(api.get(f"/pubapi/v2/latest/{coin}"))
+    val_run("prices" in response, "API response missing 'prices' key")
+    val_run("bid" in response["prices"], "API response missing 'bid' key")
+    val_run("ask" in response["prices"], "API response missing 'ask' key")
+
+    bid_price = float(response["prices"]["bid"])
+    ask_price = float(response["prices"]["ask"])
+
+    logger.info("Coin prices: %s ask, %s bid", ask_price, bid_price)
+
+    # Retrieve coin pricing statistics
+    stats = json.loads(api.get_price_history(coin, age_hours=age, stats=True, reference_price=ask_price))
+
+    # If the current price is x pct lower than average, then buy, otherwise,
+    # we stop here
+    avg_price_diff = stats["reference"]["avg_price_diff_pct"]
+    if avg_price_diff < args.buy_pct:
+        logger.info("Buy criteria not met. Buy Pct: %s. Avg Price Diff: %s", args.buy_pct, avg_price_diff)
+        return
+
+    # Buy the coin at bid price
+    coin_amount = args.amount / ask_price
+    request = {
+        "cointype": coin,
+        "amount": coin_amount,
+        "rate": ask_price
+    }
+
+    logger.debug("Buy Order Request: %s", json.dumps(request))
+    response = api.post("/api/v2/my/buy", request)
+    logger.debug("Buy Order Response: %s", response)
+    buy_response = json.loads(response)
+
+    # Wait until the order is no longer an open order (i.e. purchased)
+    # TODO
+
+    # Create a sell order for the amount x the sell pct
+    sell_rate = ask_price * (args.sell_pct/100 + 1)
+    request = {
+        "cointype": coin,
+        "amount": coin_amount,
+        "rate": sell_rate
+    }
+
+    logger.debug("Sell Order Request: %s", json.dumps(request))
+    response = api.post("/api/v2/my/sell", request)
+    logger.debug("Sell Order Response: %s", response)
+    sell_response = json.loads(response)
+
+    # Display summary information
+    buy_amount_aud = buy_response["amount"] * buy_response["rate"]
+    sell_amount_aud = sell_response["amount"] * sell_response["rate"]
+
+    print_output(args, json.dumps({
+        "buy": {
+            "id": buy_response["id"],
+            "rate": buy_response["rate"],
+            "amount": buy_response["amount"],
+            "amount_aud": buy_amount_aud
+        },
+        "sell": {
+            "id": sell_response["id"],
+            "rate": sell_response["rate"],
+            "amount": sell_response["amount"],
+            "amount_aud": sell_amount_aud
+        },
+        "profit_on_sale": sell_amount_aud - buy_amount_aud
+    }))
+
 def add_common_args(parser):
     """
     Common arguments for all subcommands
@@ -388,6 +510,22 @@ def process_args():
     subcommand_order_history.add_argument("-e", action="store", dest="end_date", help="End date", default=None)
     subcommand_order_history.add_argument("-l", action="store", dest="limit", help="Result limit (default 200, max 500)", type=int, default=None)
     subcommand_order_history.add_argument("-t", action="store", dest="cointype", help="coin type", default=None)
+
+    # simple buy sell
+    subcommand_simple_buy_sell = subparsers.add_parser(
+        "simple_buy_sell",
+        help="Simple buy sell"
+    )
+    subcommand_simple_buy_sell.set_defaults(call_func=process_simple_buy_sell)
+    add_common_args(subcommand_simple_buy_sell)
+
+    subcommand_simple_buy_sell.add_argument("cointype", action="store", help="Coin type")
+    subcommand_simple_buy_sell.add_argument("amount", action="store", help="Amount to buy (aud)", type=float)
+    subcommand_simple_buy_sell.add_argument("-a", action="store", dest="age", help="Age for price history (e.g. 4h or 3d) (default 1d)", default="1d")
+    subcommand_simple_buy_sell.add_argument("-b", action="store", dest="buy_pct", help="Pct drop to allow buy (e.g. 2 is a 2 pct drop)", type=float, default=3)
+    subcommand_simple_buy_sell.add_argument("-s", action="store", dest="sell_pct", help="Pct profit to sell for (e.g. 5 is 5 pct increase)", type=float, default=2)
+    subcommand_simple_buy_sell.add_argument("-l", action="store", dest="limit", help="Limit on open orders (default 50)", type=int, default=50)
+
 
     # market orders
     subcommand_market = subparsers.add_parser(
