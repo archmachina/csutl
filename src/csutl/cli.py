@@ -345,7 +345,7 @@ def process_simple_buy_sell(args):
     logger.info("Coin prices: %s ask, %s bid", ask_price, bid_price)
 
     # Retrieve coin pricing statistics
-    stats = json.loads(api.get_price_history(coin, age_hours=age, stats=True, reference_price=bid_price))
+    stats = json.loads(api.get_price_history(coin, age_hours=age, stats=True, reference_price=ask_price))
 
     # If the current price is x pct lower than average, then buy, otherwise,
     # we stop here
@@ -355,31 +355,53 @@ def process_simple_buy_sell(args):
         return
 
     # Buy the coin at bid price
+    coin_amount = args.amount / ask_price
     request = {
         "cointype": coin,
-        "amount": args.amount,
-        "rate": bid_price
+        "amount": coin_amount,
+        "rate": ask_price
     }
 
     logger.debug("Buy Order Request: %s", json.dumps(request))
     response = api.post("/api/v2/my/buy", request)
     logger.debug("Buy Order Response: %s", response)
-    response = json.loads(response)
+    buy_response = json.loads(response)
 
     # Wait until the order is no longer an open order (i.e. purchased)
     # TODO
 
     # Create a sell order for the amount x the sell pct
+    sell_rate = ask_price * (args.sell_pct/100 + 1)
     request = {
         "cointype": coin,
-        "amount": args.amount,
-        "rate": bid_price * (args.sell_pct/100 + 1)
+        "amount": coin_amount,
+        "rate": sell_rate
     }
 
     logger.debug("Sell Order Request: %s", json.dumps(request))
-    response = api.post("/api/v2/my/buy", request)
+    response = api.post("/api/v2/my/sell", request)
     logger.debug("Sell Order Response: %s", response)
-    response = json.loads(response)
+    sell_response = json.loads(response)
+
+    # Display summary information
+    buy_amount_aud = buy_response["amount"] * buy_response["rate"]
+    sell_amount_aud = sell_response["amount"] * sell_response["rate"]
+
+    print_output(args, json.dumps({
+        "buy": {
+            "id": buy_response["id"],
+            "rate": buy_response["rate"],
+            "amount": buy_response["amount"],
+            "amount_aud": buy_amount_aud
+        },
+        "sell": {
+            "id": sell_response["id"],
+            "rate": sell_response["rate"],
+            "amount": sell_response["amount"],
+            "amount_aud": sell_amount_aud
+        },
+        "profit_on_sale": sell_amount_aud - buy_amount_aud
+    }))
 
 def add_common_args(parser):
     """
