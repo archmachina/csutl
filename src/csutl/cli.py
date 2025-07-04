@@ -322,8 +322,13 @@ def process_manager_run(args):
     # For each coin type
     for coin in coins:
 
+        config_config = coins[coin]
+
+        # Coin types are represented in upper case
+        coin = coin.upper()
+
         # Get a list of groups for this coin
-        groups = obslib.extract_property(coin, "groups", on_missing=None)
+        groups = obslib.extract_property(coin_config, "groups", on_missing=None)
         groups = session.resolve(groups, (dict, type(None)), depth=0, on_none={})
 
         # Validate no unknown keys
@@ -332,27 +337,28 @@ def process_manager_run(args):
         # For each coin group
         for group in groups:
 
+            group_config = groups[group]
+
             # Determine the pricing history range for the group
-            history = obslib.extract_property(group, "history", on_missing=None)
+            history = obslib.extract_property(group_config, "history", on_missing=None)
             history = session.resolve(history, int, on_none=24)
 
             # Get a list of buy rules for this group
-            buy_rules_any = obslib.extract_property(group, "buy_rules_any", on_missing=None)
+            buy_rules_any = obslib.extract_property(group_config, "buy_rules_any", on_missing=None)
             buy_rules_any = session.resolve(buy_rules_any, list, on_none=[], depth=0)
 
-            buy_rules_all = obslib.extract_property(group, "buy_rules_all", on_missing=None)
+            buy_rules_all = obslib.extract_property(group_config, "buy_rules_all", on_missing=None)
             buy_rules_all = session.resolve(buy_rules_all, list, on_none=[], depth=0)
 
             # Purchase amount (aud)
-            amount = obslib.extract_property(group, "amount")
+            amount = obslib.extract_property(group_config, "amount")
             amount = session.resolve(amount, float)
 
             # Validate no unknown keys
             val_load(len(group.keys()) == 0, f"Unknown keys in group config: {group.keys()}")
 
-            # Retrieve the current AUD balance
-            response = api.post(f"/api/v2/ro/my/balance/aud?available=yes")
-            response = json.loads(response)
+            # Retrieve amount available from balance
+            response = json.loads(api.post(f"/api/v2/ro/my/balance/aud?available=yes"))
             val_run("balance" in response, "Missing balance key in coinspot API response")
             val_run("AUD" in response["balance"], "Missing AUD key in coinspot API response")
             val_run("available" in response["balance"]["AUD"], "Missing available amount in coinspot API response")
@@ -363,11 +369,19 @@ def process_manager_run(args):
             # Stop here if the balance can't meet the purchase amount
             if aud_available < amount):
                 logger.info(f"Available balance can't meet the purchase amount: {amount}")
+                continue
 
             # Retrieve the current coin balance
-            response = api.post(f"/api/v2/ro/my/balance/{coin}?available=yes")
-            coin_balance = json.loads(response)
-            logger.info("%s Balance: %s", coin, coin_balance)
+            response = json.loads(api.post(f"/api/v2/ro/my/balance/{coin}?available=yes"))
+            val_run("balance" in response, "Missing balance key in coinspot API response")
+            val_run(coin in response["balance"], f"Missing {coin} key in coinspot API response")
+            val_run("audbalance" in response["balance"][coin], "Missing audbalance amount in coinspot API response")
+            val_run("available" in response["balance"][coin], "Missing available amount in coinspot API response")
+            coin_aud_balance = float(response["balance"]["AUD"]["audbalance"])
+            coin_available = float(response["balance"]["AUD"]["available"])
+
+            logger.info("%s available: %s", coin, coin_available)
+            logger.info("%s aud balance: %s", coin, coin_aud_balance)
 
             # Retrieve the current coin prices
             response = api.post(f"/pubapi/v2/latest/{coin}")
