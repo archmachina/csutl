@@ -12,3 +12,8 @@ class RuntimeException(Exception):
     csutl runtime exception
     """
 
+class LoadException(Exception):
+    """
+    csutl config load exception
+    """
+

@@ -8,3 +8,7 @@ def val_arg(value, message):
 def val_run(value, message):
     if not value:
         raise RuntimeException(message)
+
+def val_load(value, message):
+    if not value:
+        raise LoadException(message)

@@ -19,7 +19,7 @@ setup_args = {
     "download_url": "https://pypi.org/project/csutl/",
     "entry_points": {"console_scripts": ["csutl = csutl.cli:main"]},
     "package_dir": {"": "src"},
-    "install_requires": ["requests>=2.32.0"],
+    "install_requires": ["requests>=2.32.0", "obslib>=0.7.1"],
 }
 
 if __name__ == "__main__":
